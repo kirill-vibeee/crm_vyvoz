@@ -2,7 +2,7 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "npx prisma db push --accept-data-loss && npx prisma db seed && node server.js"
+startCommand = "npx prisma db push --accept-data-loss && npx prisma db seed && npm start"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 60
+healthcheckTimeout = 120
 restartPolicyType = "on_failure"
