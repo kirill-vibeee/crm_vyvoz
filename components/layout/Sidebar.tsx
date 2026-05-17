@@ -1,6 +1,5 @@
 'use client'
 
-import { signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ReactNode } from 'react'
@@ -56,12 +55,6 @@ export function Sidebar({ role }: { role: string }) {
         <p className="text-xs text-text-muted px-4 py-2">
           {role === 'ADMIN' ? '👑 Администратор' : '👤 Менеджер'}
         </p>
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="w-full px-4 py-2 text-sm text-text-primary hover:bg-surface/80 rounded-lg transition-colors"
-        >
-          Выход
-        </button>
       </div>
     </aside>
   )

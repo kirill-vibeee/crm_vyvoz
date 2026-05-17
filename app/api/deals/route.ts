@@ -1,11 +1,23 @@
-import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+async function getDefaultUserId() {
+  const existing = await prisma.user.findFirst()
+  if (existing) return existing.id
 
+  const user = await prisma.user.create({
+    data: {
+      email: 'kirill@example.com',
+      name: 'Кирилл',
+      role: 'ADMIN',
+      passwordHash: await bcrypt.hash('kirill123', 12),
+    },
+  })
+  return user.id
+}
+
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const stage = searchParams.get('stage')
 
@@ -19,15 +31,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const data = await request.json()
+  const responsibleId = await getDefaultUserId()
 
   const deal = await prisma.deal.create({
     data: {
       ...data,
-      responsibleId: session.user.id,
+      responsibleId,
     },
     include: { responsible: true, files: true },
   })
