@@ -14,8 +14,8 @@ interface DealModalProps {
 export function DealModal({ deal, allDeals, onClose, onUpdate }: DealModalProps) {
   const [title, setTitle] = useState(deal.title)
   const [stage, setStage] = useState(deal.stage)
-  const [status, setStatus] = useState<DealStatus | undefined>(deal.status)
-  const [source, setSource] = useState<Source | undefined>(deal.source)
+  const [status, setStatus] = useState<DealStatus | undefined>(deal.status || undefined)
+  const [source, setSource] = useState<Source | undefined>(deal.source || undefined)
   const [budgetClient, setBudgetClient] = useState(deal.budgetClient || '')
   const [budgetContractor, setBudgetContractor] = useState(deal.budgetContractor || '')
   const [address, setAddress] = useState(deal.address || '')
