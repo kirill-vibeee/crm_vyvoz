@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(MANAGER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  deals        Deal[]   @relation("ResponsibleDeals")
+  comments     Comment[]
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+}
+
+// ─────────────────────────────────────────────
+// DEALS (core entity)
+// ─────────────────────────────────────────────
+
+model Deal {
+  id               String      @id @default(cuid())
+  title            String
+  stage            DealStage   @default(NEW)
+  status           DealStatus?
+  source           Source?
+
+  responsibleId    String
+  responsible      User        @relation("ResponsibleDeals", fields: [responsibleId], references: [id])
+
+  // Financials
+  budgetClient     Float?
+  budgetContractor Float?
+  profit           Float?
+  managerProfit    Float?
+
+  // Scheduling
+  orderDate        DateTime?
+  reminderDate     DateTime?
+  reminderTime     String?
+
+  // Contractor
+  contractorName   String?
+  contractorPhone  String?
+  contractorTgHandle String?
+
+  // Address
+  address          String?
+  city             String      @default("SPB")
+
+  // Meta
+  tags             String[]
+  notes            String?
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  completedAt      DateTime?
+
+  files            DealFile[]
+  comments         Comment[]
+  activities       Activity[]
+}
+
+enum DealStage {
+  NEW
+  AWAITING_DECISION
+  WAITING
+  DEFERRED
+  AGREED_FINDING
+  IN_PROGRESS
+  COMPLETED
+  REFUSED
+}
+
+enum DealStatus {
+  WAITING_ANSWER
+  AGREED
+  CALL
+  CLARIFY
+  WRITE
+  WAITING_PHOTO
+}
+
+enum Source {
+  AVITO
+  YANDEX_DIRECT
+  YANDEX_MAPS
+  WEBSITE
+  REFERRAL
+  OTHER
+}
+
+// ─────────────────────────────────────────────
+// FILES
+// ─────────────────────────────────────────────
+
+model DealFile {
+  id           String   @id @default(cuid())
+  dealId       String
+  deal         Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String
+  url          String
+
+  createdAt    DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// COMMENTS / ACTIVITY LOG
+// ─────────────────────────────────────────────
+
+model Comment {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  dealId    String
+  deal      Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  type      ActivityType
+  data      Json?
+  userId    String?
+  createdAt DateTime     @default(now())
+}
+
+enum ActivityType {
+  STAGE_CHANGED
+  FIELD_UPDATED
+  FILE_UPLOADED
+  COMMENT_ADDED
+  TELEGRAM_SENT
+}
+
+// ─────────────────────────────────────────────
+// ANALYTICS: EXPENSES
+// ─────────────────────────────────────────────
+
+model Expense {
+  id          String   @id @default(cuid())
+  name        String
+  amount      Float
+  category    ExpenseCategory
+  date        DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+enum ExpenseCategory {
+  MARKETING
+  SALARY
+  SOFTWARE
+  OTHER
+}
