@@ -1,19 +1,19 @@
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+const adapter = new PrismaPg(process.env.DATABASE_URL!)
+const prisma = new PrismaClient({ adapter })
 
 async function main() {
-  // Clear existing data
-  await prisma.activity.deleteMany()
-  await prisma.comment.deleteMany()
-  await prisma.dealFile.deleteMany()
-  await prisma.deal.deleteMany()
-  await prisma.expense.deleteMany()
-  await prisma.user.deleteMany()
+  // Idempotent: skip if users already exist
+  const existingCount = await prisma.user.count()
+  if (existingCount > 0) {
+    console.log(`✓ Database already has ${existingCount} users — skipping seed`)
+    return
+  }
 
-  // Create admin (Kirill)
-  const kirill = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email: 'kirill@example.com',
       name: 'Кирилл',
@@ -22,8 +22,7 @@ async function main() {
     },
   })
 
-  // Create manager (Vladislav)
-  const vladislav = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email: 'vladislav@example.com',
       name: 'Владислав',
@@ -32,7 +31,7 @@ async function main() {
     },
   })
 
-  console.log('✓ Created users:', { kirill, vladislav })
+  console.log('✓ Created admin (kirill@example.com) and manager (vladislav@example.com)')
 }
 
 main()
