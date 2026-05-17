@@ -105,7 +105,7 @@ export function DealModal({ deal, allDeals, onClose, onUpdate }: DealModalProps)
             <label className="block text-sm text-text-muted mb-1">Статус</label>
             <select
               value={status || ''}
-              onChange={(e) => setStatus(e.target.value as DealStatus | '')}
+              onChange={(e) => setStatus(e.target.value ? e.target.value as DealStatus : undefined)}
               className="w-full bg-background border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent text-sm"
             >
               <option value="">Не выбран</option>
@@ -122,7 +122,7 @@ export function DealModal({ deal, allDeals, onClose, onUpdate }: DealModalProps)
             <label className="block text-sm text-text-muted mb-1">Источник</label>
             <select
               value={source || ''}
-              onChange={(e) => setSource(e.target.value as Source | '')}
+              onChange={(e) => setSource(e.target.value ? e.target.value as Source : undefined)}
               className="w-full bg-background border border-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent text-sm"
             >
               <option value="">Не выбран</option>
