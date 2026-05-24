@@ -1,11 +1,11 @@
 'use client'
 
-import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Plus, FileText, ExternalLink } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/Button'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { AlertCircle, CheckCircle2, Download, FileText, Plus, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { InvoiceForm } from './InvoiceForm'
 
 interface Invoice {
@@ -15,7 +15,12 @@ interface Invoice {
   counterpartyName: string
   total: number
   status: 'DRAFT' | 'SENT' | 'PAID' | 'CANCELLED'
-  pdfUrl?: string | null
+  tochkaId?: string | null
+}
+
+interface IntegrationStatus {
+  tochka: { ok: boolean; hasToken: boolean; customerCode: string | null; accountId: string | null; error: string | null }
+  dadata: { ok: boolean; hasOwnKey: boolean; error: string | null }
 }
 
 const STATUS_LABEL: Record<Invoice['status'], { label: string; tone: 'muted' | 'accent' | 'success' | 'danger' }> = {
@@ -33,7 +38,8 @@ export function InvoiceList() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-
+  const [status, setStatus] = useState<IntegrationStatus | null>(null)
+  const [statusOpen, setStatusOpen] = useState(false)
   const [toast, setToast] = useState<{ text: string; tone: 'success' | 'warning' } | null>(null)
 
   function reload() {
@@ -44,8 +50,16 @@ export function InvoiceList() {
       .finally(() => setLoading(false))
   }
 
+  function reloadStatus() {
+    fetch('/api/integrations/status')
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => setStatus(null))
+  }
+
   useEffect(() => {
     reload()
+    reloadStatus()
   }, [])
 
   useEffect(() => {
@@ -59,22 +73,87 @@ export function InvoiceList() {
     setToast(
       info.tochkaSent
         ? { text: `Счёт №${info.number} создан и отправлен в Точка-банк`, tone: 'success' }
-        : {
-            text: `Счёт №${info.number} сохранён локально (Точка недоступна — проверь TOCHKA_JWT_TOKEN)`,
-            tone: 'warning',
-          }
+        : { text: `Счёт №${info.number} сохранён локально. Точка не приняла — проверь подключение`, tone: 'warning' }
     )
   }
+
+  const allOk = status?.tochka.ok && status?.dadata.ok
+  const anyError = status && (!status.tochka.ok || !status.dadata.ok)
 
   return (
     <div className="h-full flex flex-col">
       <header className="h-12 px-4 flex items-center justify-between border-b border-border shrink-0">
         <h1 className="text-[13px] font-semibold text-text">Счета</h1>
-        <Button size="sm" onClick={() => setShowForm(true)}>
-          <Plus size={14} strokeWidth={2.2} />
-          Новый счёт
-        </Button>
+        <div className="flex items-center gap-2">
+          {status && (
+            <button
+              onClick={() => setStatusOpen((v) => !v)}
+              className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] border transition-colors ${
+                allOk
+                  ? 'bg-success/10 text-success border-success/30 hover:bg-success/15'
+                  : 'bg-warning/10 text-warning border-warning/30 hover:bg-warning/15'
+              }`}
+            >
+              {allOk ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+              {allOk ? 'Интеграции активны' : 'Проблема с интеграцией'}
+            </button>
+          )}
+          <Button size="sm" onClick={() => setShowForm(true)}>
+            <Plus size={14} strokeWidth={2.2} />
+            Новый счёт
+          </Button>
+        </div>
       </header>
+
+      {statusOpen && status && (
+        <div className="bg-bg-elevated border-b border-border p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5">
+              {status.tochka.ok ? (
+                <CheckCircle2 size={16} className="text-success" />
+              ) : (
+                <AlertCircle size={16} className="text-warning" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium text-text">Точка-банк</div>
+              {status.tochka.ok ? (
+                <div className="text-[12px] text-text-muted mt-0.5">
+                  customer_code: <span className="font-mono">{status.tochka.customerCode}</span>{' '}
+                  · accountId: <span className="font-mono">{status.tochka.accountId?.slice(0, 12)}…</span>
+                </div>
+              ) : (
+                <div className="text-[12px] text-warning mt-0.5">{status.tochka.error}</div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5">
+              {status.dadata.ok ? (
+                <CheckCircle2 size={16} className="text-success" />
+              ) : (
+                <AlertCircle size={16} className="text-warning" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium text-text">DaData (поиск по ИНН)</div>
+              {status.dadata.ok ? (
+                <div className="text-[12px] text-text-muted mt-0.5">
+                  {status.dadata.hasOwnKey ? 'используется ваш ключ' : 'используется публичный демо-ключ (rate-limit)'}
+                </div>
+              ) : (
+                <div className="text-[12px] text-warning mt-0.5">{status.dadata.error}</div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={reloadStatus}
+            className="inline-flex items-center gap-1.5 text-[11.5px] text-text-muted hover:text-text"
+          >
+            <RefreshCw size={11} /> Проверить ещё раз
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
@@ -99,12 +178,12 @@ export function InvoiceList() {
                   <th className="text-left px-4 py-2.5 font-medium">Контрагент</th>
                   <th className="text-right px-4 py-2.5 font-medium">Сумма</th>
                   <th className="text-left px-4 py-2.5 font-medium">Статус</th>
-                  <th className="text-right px-4 py-2.5 font-medium w-12"></th>
+                  <th className="text-right px-4 py-2.5 font-medium w-20">PDF</th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((inv) => {
-                  const status = STATUS_LABEL[inv.status]
+                  const st = STATUS_LABEL[inv.status]
                   return (
                     <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-bg-elevated transition-colors">
                       <td className="px-4 py-3 text-[13px] font-medium text-text">№{inv.number}</td>
@@ -116,18 +195,20 @@ export function InvoiceList() {
                         {formatMoney(inv.total)}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge tone={status.tone}>{status.label}</Badge>
+                        <Badge tone={st.tone}>{st.label}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {inv.pdfUrl && (
+                        {inv.tochkaId ? (
                           <a
-                            href={inv.pdfUrl}
+                            href={`/api/invoices/${inv.id}/pdf`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-text-muted hover:text-accent"
+                            className="inline-flex items-center gap-1 text-text-muted hover:text-accent text-[12px]"
                           >
-                            <ExternalLink size={14} />
+                            <Download size={12} /> PDF
                           </a>
+                        ) : (
+                          <span className="text-text-dim text-[11px]">—</span>
                         )}
                       </td>
                     </tr>
@@ -135,6 +216,13 @@ export function InvoiceList() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {anyError && (
+          <div className="mt-4 bg-warning/5 border border-warning/30 rounded p-3 text-[12px] text-warning">
+            Интеграции не настроены полностью — счета сохраняются локально, но не попадут в Точка-банк.
+            Нажми "Проблема с интеграцией" выше чтобы посмотреть детали.
           </div>
         )}
       </div>
@@ -147,7 +235,7 @@ export function InvoiceList() {
 
       {toast && (
         <div
-          className={`fixed bottom-4 right-4 max-w-md rounded border px-4 py-3 text-[13px] shadow-lg animate-[fadeIn_120ms] ${
+          className={`fixed bottom-4 right-4 max-w-md rounded border px-4 py-3 text-[13px] shadow-lg ${
             toast.tone === 'success'
               ? 'bg-success/10 border-success/40 text-success'
               : 'bg-warning/10 border-warning/40 text-warning'

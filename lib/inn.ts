@@ -20,12 +20,14 @@ export async function lookupCounterpartyByInn(inn: string): Promise<Counterparty
   const cleaned = inn.replace(/\D/g, '')
   if (cleaned.length !== 10 && cleaned.length !== 12) return null
 
-  const apiKey = process.env.DADATA_API_KEY
+  // Используем личный ключ из env, иначе публичный демо-ключ DaData
+  // (демо ограничен rate-limit'ом, но для MVP сойдёт)
+  const apiKey = process.env.DADATA_API_KEY || 'b4348e6323c96f8a2457c591fc126329eb72501b'
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    Authorization: `Token ${apiKey}`,
   }
-  if (apiKey) headers.Authorization = `Token ${apiKey}`
 
   try {
     const res = await fetch(
