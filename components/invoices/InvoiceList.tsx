@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { AlertCircle, CheckCircle2, Download, FileText, Plus, RefreshCw } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Download, FileText, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { InvoiceForm } from './InvoiceForm'
 
@@ -12,7 +12,15 @@ interface Invoice {
   id: string
   number: number
   date: string
+  counterpartyInn: string
   counterpartyName: string
+  counterpartyKpp?: string | null
+  counterpartyAddress?: string | null
+  serviceName: string
+  unit: string
+  quantity: number
+  price: number
+  withVat: boolean
   total: number
   status: 'DRAFT' | 'SENT' | 'PAID' | 'CANCELLED'
   tochkaId?: string | null
@@ -38,6 +46,7 @@ export function InvoiceList() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Invoice | null>(null)
   const [status, setStatus] = useState<IntegrationStatus | null>(null)
   const [statusOpen, setStatusOpen] = useState(false)
   const [toast, setToast] = useState<{ text: string; tone: 'success' | 'warning' } | null>(null)
@@ -72,9 +81,21 @@ export function InvoiceList() {
     reload()
     setToast(
       info.tochkaSent
-        ? { text: `Счёт №${info.number} создан и отправлен в Точка-банк`, tone: 'success' }
+        ? { text: `Счёт №${info.number} ${editing ? 'обновлён' : 'создан'} и отправлен в Точка-банк`, tone: 'success' }
         : { text: `Счёт №${info.number} сохранён локально. Точка не приняла — проверь подключение`, tone: 'warning' }
     )
+    setEditing(null)
+  }
+
+  async function deleteInvoice(inv: Invoice) {
+    if (!confirm(`Удалить счёт №${inv.number}?${inv.tochkaId ? '\nОн также будет удалён в Точка-банке.' : ''}`)) return
+    const res = await fetch(`/api/invoices/${inv.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setInvoices((prev) => prev.filter((x) => x.id !== inv.id))
+      setToast({ text: `Счёт №${inv.number} удалён`, tone: 'success' })
+    } else {
+      setToast({ text: 'Не удалось удалить', tone: 'warning' })
+    }
   }
 
   const allOk = status?.tochka.ok && status?.dadata.ok
@@ -179,6 +200,7 @@ export function InvoiceList() {
                   <th className="text-right px-4 py-2.5 font-medium">Сумма</th>
                   <th className="text-left px-4 py-2.5 font-medium">Статус</th>
                   <th className="text-right px-4 py-2.5 font-medium w-20">PDF</th>
+                  <th className="text-right px-4 py-2.5 font-medium w-24">Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -211,6 +233,24 @@ export function InvoiceList() {
                           <span className="text-text-dim text-[11px]">—</span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => setEditing(inv)}
+                            className="w-6 h-6 inline-flex items-center justify-center rounded text-text-muted hover:text-text hover:bg-bg-elevated"
+                            title="Редактировать"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            onClick={() => deleteInvoice(inv)}
+                            className="w-6 h-6 inline-flex items-center justify-center rounded text-text-muted hover:text-danger hover:bg-danger/10"
+                            title="Удалить"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
@@ -228,9 +268,13 @@ export function InvoiceList() {
       </div>
 
       <InvoiceForm
-        open={showForm}
-        onClose={() => setShowForm(false)}
+        open={showForm || !!editing}
+        onClose={() => {
+          setShowForm(false)
+          setEditing(null)
+        }}
         onCreated={handleCreated}
+        initial={editing}
       />
 
       {toast && (

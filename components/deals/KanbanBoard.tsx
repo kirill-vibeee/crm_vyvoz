@@ -1,6 +1,6 @@
 'use client'
 
-import { Deal, DealStageId, PIPELINE_STAGES, REFUSED_STAGE } from '@/types'
+import { Deal, DealStageId, PIPELINE_STAGES_VISIBLE } from '@/types'
 import {
   DndContext,
   DragEndEvent,
@@ -14,10 +14,15 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { DealCard } from './DealCard'
 import { DealDetailPanel } from './DealDetailPanel'
+import { FinalStagesDropZones } from './FinalStagesDropZones'
 import { KanbanColumn } from './KanbanColumn'
-import { RefusedDropZone } from './RefusedDropZone'
 
-export function KanbanBoard() {
+interface KanbanBoardProps {
+  initialDealId?: string | null
+  onDealSelect?: (id: string | null) => void
+}
+
+export function KanbanBoard({ initialDealId, onDealSelect }: KanbanBoardProps = {}) {
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null)
@@ -36,10 +41,17 @@ export function KanbanBoard() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (initialDealId && deals.length) {
+      const d = deals.find((x) => x.id === initialDealId)
+      if (d) setSelectedDeal(d)
+    }
+  }, [initialDealId, deals])
+
   const dealsByStage = useMemo(() => {
-    const map: Record<string, Deal[]> = {}
-    for (const stage of [...PIPELINE_STAGES, REFUSED_STAGE]) {
-      map[stage.id] = []
+    const map: Record<string, Deal[]> = {
+      NEW: [], AWAITING_DECISION: [], DEFERRED: [], AGREED_FINDING: [],
+      IN_PROGRESS: [], COMPLETED: [], REFUSED: [],
     }
     for (const deal of deals) {
       const list = map[deal.stage as DealStageId]
@@ -107,7 +119,13 @@ export function KanbanBoard() {
   async function handleDelete(id: string) {
     setDeals((prev) => prev.filter((d) => d.id !== id))
     setSelectedDeal(null)
+    onDealSelect?.(null)
     await fetch(`/api/deals/${id}`, { method: 'DELETE' })
+  }
+
+  function handleSelect(d: Deal | null) {
+    setSelectedDeal(d)
+    onDealSelect?.(d?.id || null)
   }
 
   if (loading) {
@@ -126,28 +144,29 @@ export function KanbanBoard() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden snap-x snap-mandatory md:snap-none">
           <div className="flex gap-3 h-full px-4 pt-4 pb-2 min-h-0">
-            {PIPELINE_STAGES.map((stage) => (
+            {PIPELINE_STAGES_VISIBLE.map((stage) => (
               <KanbanColumn
                 key={stage.id}
                 stage={stage}
                 deals={dealsByStage[stage.id] || []}
-                onCardClick={setSelectedDeal}
+                onCardClick={handleSelect}
                 onCreate={stage.id === 'NEW' ? handleCreate : undefined}
               />
             ))}
           </div>
         </div>
 
-        <RefusedDropZone
-          deals={dealsByStage[REFUSED_STAGE.id] || []}
-          onCardClick={setSelectedDeal}
+        <FinalStagesDropZones
+          completedDeals={dealsByStage.COMPLETED || []}
+          refusedDeals={dealsByStage.REFUSED || []}
+          isDragging={!!activeDeal}
         />
 
         <DragOverlay>
           {activeDeal && (
-            <div className="rotate-2 opacity-95 cursor-grabbing">
+            <div className="rotate-2 opacity-95 cursor-grabbing w-72">
               <DealCard deal={activeDeal} onClick={() => {}} />
             </div>
           )}
@@ -156,7 +175,7 @@ export function KanbanBoard() {
 
       <DealDetailPanel
         deal={selectedDeal}
-        onClose={() => setSelectedDeal(null)}
+        onClose={() => handleSelect(null)}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
       />

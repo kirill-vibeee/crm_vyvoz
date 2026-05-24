@@ -160,3 +160,25 @@ export async function createTochkaInvoice(
 export function buildPdfUrl(customerCode: string, documentId: string): string {
   return `${TOCHKA_BASE}/invoice/v1.0/bills/${customerCode}/${documentId}/file`
 }
+
+export async function deleteTochkaInvoice(documentId: string): Promise<boolean> {
+  const acc = await resolveAccount()
+  if (!acc) return false
+  const headers = authHeaders()
+  if (!headers) return false
+  try {
+    const res = await fetch(
+      `${TOCHKA_BASE}/invoice/v1.0/bills/${acc.customerCode}/${documentId}`,
+      { method: 'DELETE', headers }
+    )
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.error(`[tochka] DELETE bill ${documentId} → ${res.status}: ${text.slice(0, 300)}`)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error(`[tochka] DELETE error:`, err)
+    return false
+  }
+}

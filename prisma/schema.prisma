@@ -53,6 +53,12 @@ model Deal {
   reminderDate     DateTime?
   reminderTime     String?
 
+  // Client contact
+  contactName      String?
+  contactPhone     String?
+  contactEmail     String?
+  contactTelegram  String?
+
   // Contractor
   contractorName   String?
   contractorPhone  String?
@@ -100,10 +106,9 @@ enum DealStatus {
 
 enum Source {
   AVITO
-  YANDEX_DIRECT
-  YANDEX_MAPS
   WEBSITE
   REFERRAL
+  RECURRING
   OTHER
 }
 
@@ -131,14 +136,29 @@ model DealFile {
 // ─────────────────────────────────────────────
 
 model Comment {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   dealId    String
-  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal      Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
+  author    User             @relation(fields: [authorId], references: [id])
   text      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  channel   CommentChannel   @default(NOTE)
+  direction CommentDirection?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+enum CommentChannel {
+  NOTE
+  TG
+  AVITO
+  MAX
+  CALL
+}
+
+enum CommentDirection {
+  IN
+  OUT
 }
 
 model Activity {

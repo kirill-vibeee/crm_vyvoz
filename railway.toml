@@ -6,3 +6,6 @@ startCommand = "sh -c 'npx prisma db push --accept-data-loss || echo skip-push; 
 healthcheckPath = "/api/health"
 healthcheckTimeout = 180
 restartPolicyType = "on_failure"
+
+[[deploy.volumes]]
+mountPath = "/app/uploads"

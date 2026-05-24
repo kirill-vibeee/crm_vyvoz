@@ -7,10 +7,26 @@ import { SlidePanel } from '@/components/ui/SlidePanel'
 import { Loader2, Search, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+interface ExistingInvoice {
+  id: string
+  number: number
+  date: string
+  counterpartyInn: string
+  counterpartyName: string
+  counterpartyKpp?: string | null
+  counterpartyAddress?: string | null
+  serviceName: string
+  unit: string
+  quantity: number
+  price: number
+  withVat: boolean
+}
+
 interface InvoiceFormProps {
   open: boolean
   onClose: () => void
   onCreated: (info: { tochkaSent: boolean; number: number }) => void
+  initial?: ExistingInvoice | null
 }
 
 interface Counterparty {
@@ -42,7 +58,8 @@ const VAT_OPTIONS = [
   { value: 'nds_0', label: 'НДС 0%' },
 ]
 
-export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
+export function InvoiceForm({ open, onClose, onCreated, initial }: InvoiceFormProps) {
+  const isEdit = !!initial
   const [number, setNumber] = useState<number | ''>('')
   const [numberSource, setNumberSource] = useState<'tochka' | 'local' | null>(null)
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -65,6 +82,26 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
 
   useEffect(() => {
     if (!open) return
+    if (initial) {
+      // edit mode
+      setNumber(initial.number)
+      setDate(initial.date.slice(0, 10))
+      setInn(initial.counterpartyInn)
+      setCounterparty({
+        inn: initial.counterpartyInn,
+        kpp: initial.counterpartyKpp || undefined,
+        name: initial.counterpartyName,
+        address: initial.counterpartyAddress || undefined,
+        type: initial.counterpartyInn.length === 12 ? 'INDIVIDUAL' : 'LEGAL',
+        source: 'manual',
+      })
+      setServiceName(initial.serviceName)
+      setUnit(initial.unit)
+      setQuantity(initial.quantity)
+      setPrice(initial.price)
+      setVat(initial.withVat ? 'nds_22' : 'none')
+      return
+    }
     fetch('/api/invoices/next-number')
       .then((r) => r.json())
       .then((d) => {
@@ -75,7 +112,7 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
         setNumber(1)
         setNumberSource(null)
       })
-  }, [open])
+  }, [open, initial])
 
   function resetCounterparty() {
     setCounterparty(null)
@@ -142,8 +179,10 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
     if (!counterparty || !price || !number) return
     setSaving(true)
     try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
+      const url = isEdit ? `/api/invoices/${initial!.id}` : '/api/invoices'
+      const method = isEdit ? 'PATCH' : 'POST'
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           number,
@@ -185,13 +224,13 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
     <SlidePanel
       open={open}
       onClose={onClose}
-      title="Новый счёт"
+      title={isEdit ? `Счёт №${initial!.number}` : 'Новый счёт'}
       width={520}
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Отмена</Button>
           <Button onClick={submit} disabled={saving || !counterparty || !price}>
-            {saving ? 'Сохранение…' : 'Создать счёт'}
+            {saving ? 'Сохранение…' : isEdit ? 'Обновить счёт' : 'Создать счёт'}
           </Button>
         </div>
       }

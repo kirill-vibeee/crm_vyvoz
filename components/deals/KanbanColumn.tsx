@@ -13,7 +13,7 @@ interface KanbanColumnProps {
   onCreate?: (title: string) => Promise<void>
 }
 
-function formatMoney(n: number) {
+function fmtMoney(n: number) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М ₽'
   if (n >= 1_000) return Math.round(n / 1000) + 'К ₽'
   return n + ' ₽'
@@ -21,25 +21,30 @@ function formatMoney(n: number) {
 
 export function KanbanColumn({ stage, deals, onCardClick, onCreate }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id, data: { stageId: stage.id } })
-
   const totalBudget = deals.reduce((sum, d) => sum + (d.budgetClient || 0), 0)
   const dealIds = deals.map((d) => d.id)
 
   return (
-    <div className="w-72 shrink-0 flex flex-col h-full">
-      <div className="px-1 mb-2 flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full ${stage.dot}`} />
-        <span className="text-[12px] font-semibold text-text">{stage.label}</span>
-        <span className="text-[11px] text-text-dim">{deals.length}</span>
+    <div className="shrink-0 flex flex-col h-full snap-start min-w-[88vw] md:min-w-0 md:w-72">
+      <div className="px-1 mb-2 flex items-center gap-2 h-7">
+        <span className={`w-1.5 h-1.5 rounded-full ${stage.dot} shrink-0`} />
+        <span className="font-mono uppercase tracking-wider text-[11px] font-semibold text-text">
+          {stage.label}
+        </span>
+        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10.5px] rounded-full bg-bg-elevated border border-border text-text-muted font-medium">
+          {deals.length}
+        </span>
         {totalBudget > 0 && (
-          <span className="text-[11px] text-text-muted ml-auto">{formatMoney(totalBudget)}</span>
+          <span className="text-[10.5px] text-text-dim ml-auto font-mono">
+            {fmtMoney(totalBudget)}
+          </span>
         )}
       </div>
 
       <div
         ref={setNodeRef}
-        className={`flex-1 min-h-0 overflow-y-auto rounded-md border border-dashed transition-colors p-1.5 space-y-1.5 ${
-          isOver ? 'border-accent bg-accent-soft/30' : 'border-transparent'
+        className={`flex-1 min-h-0 overflow-y-auto rounded-md transition-colors p-1 space-y-1.5 ${
+          isOver ? 'bg-accent-soft border border-accent/50' : 'bg-surface/40 border border-border/50'
         }`}
       >
         <SortableContext items={dealIds} strategy={verticalListSortingStrategy}>

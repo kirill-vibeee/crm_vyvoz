@@ -1,20 +1,22 @@
 'use client'
 
-import { Deal, SOURCE_OPTIONS } from '@/types'
+import { autoDealTitle } from '@/lib/dealTitle'
+import { Deal, SOURCE_OPTIONS, STATUS_OPTIONS } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { MapPin, User, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { Calendar, Clock, User } from 'lucide-react'
 
 interface DealCardProps {
   deal: Deal
   onClick: () => void
-  isDragging?: boolean
 }
 
-function formatMoney(n?: number | null) {
+function fmtMoney(n?: number | null) {
   if (n == null) return null
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М ₽'
+  if (n >= 1_000) return Math.round(n / 1000) + 'К ₽'
   return new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
 }
 
@@ -30,9 +32,12 @@ export function DealCard({ deal, onClick }: DealCardProps) {
     opacity: isDragging ? 0.4 : 1,
   }
 
+  const title = autoDealTitle(deal)
   const sourceLabel = deal.source ? SOURCE_OPTIONS.find((s) => s.value === deal.source)?.label : null
-  const budget = formatMoney(deal.budgetClient)
-  const orderDate = deal.orderDate ? format(new Date(deal.orderDate), 'd MMM', { locale: ru }) : null
+  const statusLabel = deal.status ? STATUS_OPTIONS.find((s) => s.value === deal.status)?.label : null
+  const budget = fmtMoney(deal.budgetClient)
+  const date = deal.orderDate || deal.reminderDate
+  const dateStr = date ? format(new Date(date), 'd MMM', { locale: ru }) : null
 
   return (
     <div
@@ -41,43 +46,45 @@ export function DealCard({ deal, onClick }: DealCardProps) {
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="bg-bg-elevated border border-border rounded-md p-3 cursor-grab active:cursor-grabbing hover:border-border-hover transition-colors group"
+      className="bg-bg-elevated border border-border rounded-md p-2.5 cursor-grab active:cursor-grabbing hover:border-border-hover hover:bg-surface-hover transition-colors group"
     >
       <div className="text-[13px] font-medium text-text leading-snug mb-2 line-clamp-2">
-        {deal.title}
+        {title}
       </div>
 
-      <div className="flex flex-wrap gap-1.5 mb-2">
+      <div className="flex flex-wrap items-center gap-1 mb-1.5">
         {sourceLabel && (
-          <span className="inline-flex items-center px-1.5 h-5 text-[10.5px] font-medium rounded bg-surface text-text-muted border border-border">
+          <span className="inline-flex items-center px-1.5 h-[18px] text-[10.5px] font-medium rounded bg-surface text-text-muted border border-border">
             {sourceLabel}
           </span>
         )}
+        {statusLabel && (
+          <span className="inline-flex items-center px-1.5 h-[18px] text-[10.5px] font-medium rounded bg-accent-soft text-accent">
+            {statusLabel}
+          </span>
+        )}
         {budget && (
-          <span className="inline-flex items-center px-1.5 h-5 text-[10.5px] font-medium rounded bg-accent-soft text-accent">
+          <span className="inline-flex items-center px-1.5 h-[18px] text-[10.5px] font-semibold rounded text-success">
             {budget}
           </span>
         )}
       </div>
 
-      <div className="space-y-1 text-[11.5px] text-text-muted">
-        {deal.address && (
-          <div className="flex items-center gap-1.5">
-            <MapPin size={11} strokeWidth={2} />
-            <span className="truncate">{deal.address}</span>
-          </div>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-text-muted">
+        {dateStr && (
+          <span className="inline-flex items-center gap-1">
+            <Calendar size={10} strokeWidth={2} /> {dateStr}
+          </span>
         )}
-        {deal.contractorName && (
-          <div className="flex items-center gap-1.5">
-            <User size={11} strokeWidth={2} />
-            <span className="truncate">{deal.contractorName}</span>
-          </div>
+        {deal.reminderTime && (
+          <span className="inline-flex items-center gap-1">
+            <Clock size={10} strokeWidth={2} /> {deal.reminderTime}
+          </span>
         )}
-        {orderDate && (
-          <div className="flex items-center gap-1.5">
-            <Calendar size={11} strokeWidth={2} />
-            <span>{orderDate}</span>
-          </div>
+        {deal.contactName && (
+          <span className="inline-flex items-center gap-1 truncate max-w-[120px]">
+            <User size={10} strokeWidth={2} /> {deal.contactName}
+          </span>
         )}
       </div>
     </div>
