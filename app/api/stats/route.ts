@@ -26,12 +26,12 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  const completed = allDeals.filter((d) => d.stage === 'COMPLETED')
+  const completed = (allDeals as any[]).filter((d) => d.stage === 'COMPLETED')
 
-  const sumBudgetClient = completed.reduce((s, d) => s + (d.budgetClient || 0), 0)
-  const sumBudgetContractor = completed.reduce((s, d) => s + (d.budgetContractor || 0), 0)
-  const sumProfit = completed.reduce((s, d) => s + (d.profit || 0), 0)
-  const sumManagerProfit = completed.reduce((s, d) => s + (d.managerProfit || 0), 0)
+  const sumBudgetClient = completed.reduce((s: number, d: any) => s + (d.budgetClient || 0), 0)
+  const sumBudgetContractor = completed.reduce((s: number, d: any) => s + (d.budgetContractor || 0), 0)
+  const sumProfit = completed.reduce((s: number, d: any) => s + (d.profit || 0), 0)
+  const sumManagerProfit = completed.reduce((s: number, d: any) => s + (d.managerProfit || 0), 0)
   const conversion = allDeals.length > 0 ? completed.length / allDeals.length : 0
 
   // По источникам (only COMPLETED)

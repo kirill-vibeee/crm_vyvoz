@@ -1,21 +1,15 @@
-import { PrismaClient } from "@prisma/client"
-import { PrismaPg } from "@prisma/adapter-pg"
+/**
+ * MVP mode: вместо настоящего Prisma + Postgres используем in-memory store.
+ * Поверхность API совпадает (prisma.deal.findMany / create / update / delete и т.д.)
+ * так что вызовы из app/api/* и lib/* не требуют изменений.
+ *
+ * Данные не сохраняются между перезапусками контейнера — это OK для пощупать.
+ */
 
-// Поддержка BigInt в JSON.stringify (Prisma возвращает BigInt для @id BigInt полей)
+import { memstore } from './memstore'
+
 ;(BigInt.prototype as any).toJSON = function () {
   return this.toString()
 }
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient }
-
-function createPrismaClient() {
-  const adapter = new PrismaPg(process.env.DATABASE_URL!)
-  return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === "development" ? ["query"] : [],
-  })
-}
-
-export const prisma = globalForPrisma.prisma || createPrismaClient()
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+export const prisma: any = memstore
