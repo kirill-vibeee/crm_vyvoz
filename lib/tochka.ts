@@ -4,38 +4,23 @@
  * Базовый URL: https://enter.tochka.com/uapi
  * Авторизация: Bearer JWT
  *
- * Документация: https://developers.tochka.com/docs/tochka-api/
+ * ВАЖНО: customer_code в JWT-payload может НЕ совпадать с реальным customerCode
+ * из API. Реальный код берётся из /open-banking/v1.0/accounts. Не используем
+ * env var TOCHKA_CUSTOMER_CODE — всегда подтягиваем из API.
  *
- * Используемые endpoints:
- * - GET  /open-banking/v1.0/accounts                            — список счетов клиента
- * - GET  /invoice/v1.0/bills/{customerCode}                     — список выставленных счетов
- * - POST /invoice/v1.0/bills                                    — создание счёта на оплату
- * - GET  /invoice/v1.0/bills/{customerCode}/{documentId}/file   — PDF счёта
+ * Проверенные endpoints:
+ *  GET  /open-banking/v1.0/accounts                          — список счетов клиента
+ *  POST /invoice/v1.0/bills                                  — создание счёта
+ *  GET  /invoice/v1.0/bills/{customerCode}/{documentId}/file — PDF счёта
+ *
+ * GET /invoice/v1.0/bills/{customerCode} возвращает 501 Not Implemented — следующий
+ * номер счёта определяем по локальной БД.
  */
 
 const TOCHKA_BASE = 'https://enter.tochka.com/uapi'
 
 function getToken(): string | null {
   return process.env.TOCHKA_JWT_TOKEN || null
-}
-
-function decodeJwtPayload(token: string): Record<string, any> | null {
-  try {
-    const parts = token.split('.')
-    if (parts.length < 2) return null
-    const json = Buffer.from(parts[1], 'base64').toString('utf-8')
-    return JSON.parse(json)
-  } catch {
-    return null
-  }
-}
-
-export function getCustomerCode(): string | null {
-  if (process.env.TOCHKA_CUSTOMER_CODE) return process.env.TOCHKA_CUSTOMER_CODE
-  const token = getToken()
-  if (!token) return null
-  const payload = decodeJwtPayload(token)
-  return payload?.customer_code || null
 }
 
 function authHeaders(): Record<string, string> | null {
@@ -58,7 +43,7 @@ async function tochkaFetch(path: string, init?: RequestInit): Promise<any | null
     })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
-      console.error(`[tochka] ${path} → ${res.status}: ${text.slice(0, 300)}`)
+      console.error(`[tochka] ${path} → ${res.status}: ${text.slice(0, 500)}`)
       return null
     }
     return await res.json()
@@ -68,79 +53,95 @@ async function tochkaFetch(path: string, init?: RequestInit): Promise<any | null
   }
 }
 
-export interface TochkaAccount {
+interface TochkaAccountResolved {
+  customerCode: string
   accountId: string
-  accountCode?: string
-  accountName?: string
-  currency?: string
 }
 
-export async function getAccountId(): Promise<string | null> {
-  if (process.env.TOCHKA_ACCOUNT_ID) return process.env.TOCHKA_ACCOUNT_ID
+let cachedAccount: TochkaAccountResolved | null = null
 
+export async function resolveAccount(): Promise<TochkaAccountResolved | null> {
+  if (cachedAccount) return cachedAccount
   const data = await tochkaFetch('/open-banking/v1.0/accounts')
-  const account = data?.Data?.Account?.[0]
-  return account?.accountId || null
+  const acc = data?.Data?.Account?.[0]
+  if (!acc) return null
+  cachedAccount = { customerCode: acc.customerCode, accountId: acc.accountId }
+  return cachedAccount
 }
 
-export interface TochkaInvoiceItem {
-  serviceName: string
-  unit: string
-  quantity: number
-  price: number
-  withVat: boolean
+export async function getCustomerCode(): Promise<string | null> {
+  const acc = await resolveAccount()
+  return acc?.customerCode || null
+}
+
+// Маппинг типа контрагента (DaData → Точка)
+export type DaDataType = 'LEGAL' | 'INDIVIDUAL'
+function tochkaType(t: DaDataType): 'company' | 'ip' {
+  return t === 'INDIVIDUAL' ? 'ip' : 'company'
+}
+
+// Маппинг ставки НДС (UI → Точка)
+export type VatKind = 'none' | 'nds_0' | 'nds_5' | 'nds_7' | 'nds_10' | 'nds_22'
+function tochkaNds(v: VatKind): string {
+  if (v === 'none') return 'without_nds'
+  return v
 }
 
 export interface TochkaInvoicePayload {
   number: number
-  date: string
+  date: string                       // YYYY-MM-DD
   counterpartyInn: string
   counterpartyName: string
-  counterpartyKpp?: string | null
-  item: TochkaInvoiceItem
+  counterpartyType: DaDataType
+  item: {
+    name: string
+    unitCode: string                 // "услуга." | "шт." | ...
+    quantity: number
+    price: number
+    vat: VatKind
+  }
 }
 
 export interface TochkaCreateResult {
   documentId: string
-  status: 'sent'
+  customerCode: string
 }
 
 export async function createTochkaInvoice(
   payload: TochkaInvoicePayload
 ): Promise<TochkaCreateResult | null> {
-  const customerCode = getCustomerCode()
-  if (!customerCode) return null
-
-  const accountId = await getAccountId()
-  if (!accountId) {
-    console.error('[tochka] cannot determine accountId')
+  const account = await resolveAccount()
+  if (!account) {
+    console.error('[tochka] cannot resolve account')
     return null
   }
 
-  const nds = payload.item.withVat ? 'nds20' : 'nds_not_charged'
-  const amount = payload.item.quantity * payload.item.price
-
+  const total = +(payload.item.quantity * payload.item.price).toFixed(2)
   const body = {
     Data: {
-      customerCode,
-      accountId,
+      customerCode: account.customerCode,
+      accountId: account.accountId,
       Content: {
-        invoiceNumber: String(payload.number),
-        invoiceDate: payload.date,
-        items: [
-          {
-            name: payload.item.serviceName,
-            unit: payload.item.unit,
-            quantity: payload.item.quantity,
-            price: payload.item.price,
-            nds,
-          },
-        ],
+        Invoice: {
+          number: String(payload.number),
+          date: payload.date,
+          totalAmount: total,
+          Positions: [
+            {
+              name: payload.item.name,
+              unitCode: payload.item.unitCode,
+              quantity: payload.item.quantity,
+              price: payload.item.price,
+              totalAmount: total,
+              ndsKind: tochkaNds(payload.item.vat),
+            },
+          ],
+        },
       },
       SecondSide: {
-        inn: payload.counterpartyInn,
+        taxCode: payload.counterpartyInn,
         name: payload.counterpartyName,
-        ...(payload.counterpartyKpp ? { kpp: payload.counterpartyKpp } : {}),
+        type: tochkaType(payload.counterpartyType),
       },
     },
   }
@@ -153,45 +154,9 @@ export async function createTochkaInvoice(
   const documentId = result?.Data?.documentId
   if (!documentId) return null
 
-  return { documentId, status: 'sent' }
+  return { documentId, customerCode: account.customerCode }
 }
 
-export interface TochkaBillSummary {
-  documentId: string
-  invoiceNumber?: string
-  invoiceDate?: string
-  amount?: number
-}
-
-export async function listTochkaInvoices(): Promise<TochkaBillSummary[] | null> {
-  const customerCode = getCustomerCode()
-  if (!customerCode) return null
-
-  const data = await tochkaFetch(`/invoice/v1.0/bills/${customerCode}`)
-  const bills = data?.Data?.Bill || data?.Data?.bills || data?.Data
-  if (!Array.isArray(bills)) return null
-
-  return bills.map((b: any) => ({
-    documentId: b.documentId,
-    invoiceNumber: b.Content?.invoiceNumber || b.invoiceNumber,
-    invoiceDate: b.Content?.invoiceDate || b.invoiceDate,
-    amount: b.Content?.totalAmount || b.amount,
-  }))
-}
-
-export async function getNextTochkaInvoiceNumber(): Promise<number | null> {
-  const bills = await listTochkaInvoices()
-  if (!bills) return null
-  const numbers = bills
-    .map((b) => Number(b.invoiceNumber))
-    .filter((n) => !isNaN(n) && n > 0)
-  if (numbers.length === 0) return 1
-  return Math.max(...numbers) + 1
-}
-
-export function getInvoicePdfUrl(documentId: string): string | null {
-  const customerCode = getCustomerCode()
-  const token = getToken()
-  if (!customerCode || !token) return null
+export function buildPdfUrl(customerCode: string, documentId: string): string {
   return `${TOCHKA_BASE}/invoice/v1.0/bills/${customerCode}/${documentId}/file`
 }

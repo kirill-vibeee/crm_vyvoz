@@ -1,15 +1,12 @@
 import { prisma } from '@/lib/prisma'
-import { getCustomerCode } from '@/lib/tochka'
+import { buildPdfUrl, getCustomerCode } from '@/lib/tochka'
 import { NextResponse } from 'next/server'
-
-const TOCHKA_BASE = 'https://enter.tochka.com/uapi'
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-
   const invoice = await prisma.invoice.findUnique({ where: { id } })
   if (!invoice) {
     return NextResponse.json({ error: 'Счёт не найден' }, { status: 404 })
@@ -19,27 +16,22 @@ export async function GET(
   }
 
   const token = process.env.TOCHKA_JWT_TOKEN
-  const customerCode = getCustomerCode()
+  const customerCode = await getCustomerCode()
   if (!token || !customerCode) {
     return NextResponse.json({ error: 'Точка-банк не настроен' }, { status: 500 })
   }
 
-  const tochkaUrl = `${TOCHKA_BASE}/invoice/v1.0/bills/${customerCode}/${invoice.tochkaId}/file`
-  const res = await fetch(tochkaUrl, {
+  const res = await fetch(buildPdfUrl(customerCode, invoice.tochkaId), {
     headers: { Authorization: `Bearer ${token}` },
   })
-
   if (!res.ok) {
-    return NextResponse.json(
-      { error: `Точка вернула ${res.status}` },
-      { status: res.status }
-    )
+    return NextResponse.json({ error: `Точка вернула ${res.status}` }, { status: res.status })
   }
 
   const buf = await res.arrayBuffer()
   return new Response(buf, {
     headers: {
-      'Content-Type': res.headers.get('content-type') || 'application/pdf',
+      'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="invoice-${invoice.number}.pdf"`,
     },
   })

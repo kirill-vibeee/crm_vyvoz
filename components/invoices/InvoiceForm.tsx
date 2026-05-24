@@ -18,8 +18,29 @@ interface Counterparty {
   kpp?: string
   name: string
   address?: string
+  type: 'LEGAL' | 'INDIVIDUAL'
   source: 'auto' | 'manual'
 }
+
+const UNIT_OPTIONS = [
+  { value: 'услуга.', label: 'Услуга' },
+  { value: 'шт.', label: 'Штука' },
+  { value: 'упак.', label: 'Упаковка' },
+  { value: 'компл.', label: 'Комплект' },
+  { value: 'кг.', label: 'Килограмм' },
+  { value: 'м3.', label: 'Кубометр' },
+  { value: 'ч.', label: 'Час' },
+  { value: 'сут.', label: 'Сутки' },
+]
+
+const VAT_OPTIONS = [
+  { value: 'none', label: 'Без НДС' },
+  { value: 'nds_22', label: 'НДС 22%' },
+  { value: 'nds_10', label: 'НДС 10%' },
+  { value: 'nds_7', label: 'НДС 7%' },
+  { value: 'nds_5', label: 'НДС 5%' },
+  { value: 'nds_0', label: 'НДС 0%' },
+]
 
 export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
   const [number, setNumber] = useState<number | ''>('')
@@ -36,10 +57,10 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
   const [manualAddress, setManualAddress] = useState('')
 
   const [serviceName, setServiceName] = useState('Услуги по уборке территории')
-  const [unit, setUnit] = useState('Услуга')
+  const [unit, setUnit] = useState('услуга.')
   const [quantity, setQuantity] = useState(1)
   const [price, setPrice] = useState<number | ''>('')
-  const [vat, setVat] = useState<'none' | 'vat20'>('none')
+  const [vat, setVat] = useState<'none' | 'nds_22' | 'nds_10' | 'nds_7' | 'nds_5' | 'nds_0'>('none')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -87,6 +108,7 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
         kpp: data.kpp,
         name: data.name,
         address: data.address,
+        type: data.type === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'LEGAL',
         source: 'auto',
       })
     } catch {
@@ -103,11 +125,14 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
       setInnNotice('Заполни ИНН и название')
       return
     }
+    // ИП = ИНН 12 цифр, ООО = 10 цифр
+    const type: 'LEGAL' | 'INDIVIDUAL' = cleaned.length === 12 ? 'INDIVIDUAL' : 'LEGAL'
     setCounterparty({
       inn: cleaned,
       kpp: manualKpp || undefined,
       name: manualName.trim(),
       address: manualAddress || undefined,
+      type,
       source: 'manual',
     })
     setManualEditing(false)
@@ -127,11 +152,12 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
           counterpartyName: counterparty.name,
           counterpartyKpp: counterparty.kpp,
           counterpartyAddress: counterparty.address,
+          counterpartyType: counterparty.type,
           serviceName,
           unit,
           quantity,
           price: Number(price),
-          withVat: vat === 'vat20',
+          vat,
         }),
       })
       if (res.ok) {
@@ -172,16 +198,7 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
     >
       <div className="p-5 space-y-5">
         <div className="grid grid-cols-2 gap-3">
-          <Field
-            label="Номер счёта"
-            hint={
-              numberSource === 'tochka'
-                ? 'из документооборота Точки'
-                : numberSource === 'local'
-                ? 'из локальной БД (Точка недоступна)'
-                : undefined
-            }
-          >
+          <Field label="Номер счёта" hint="следующий по порядку, можно изменить">
             <Input
               type="number"
               value={number}
@@ -281,7 +298,7 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
           </Field>
           <div className="grid grid-cols-3 gap-3 mt-3">
             <Field label="Единица">
-              <Input value={unit} onChange={(e) => setUnit(e.target.value)} />
+              <Select value={unit} onChange={(e) => setUnit(e.target.value)} options={UNIT_OPTIONS} />
             </Field>
             <Field label="Кол-во">
               <Input
@@ -299,14 +316,7 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
             </Field>
           </div>
           <Field label="НДС" className="mt-3">
-            <Select
-              value={vat}
-              onChange={(e) => setVat(e.target.value as any)}
-              options={[
-                { value: 'none', label: 'Без НДС' },
-                { value: 'vat20', label: 'НДС 20%' },
-              ]}
-            />
+            <Select value={vat} onChange={(e) => setVat(e.target.value as any)} options={VAT_OPTIONS} />
           </Field>
         </div>
 
