@@ -1,6 +1,6 @@
 const CALC_URL =
   process.env.NEXT_PUBLIC_CALCULATOR_URL ||
-  'https://waste-calculator-production.up.railway.app/'
+  'https://waste-calculator-production.up.railway.app/static/index.html'
 
 export default function CalculatorPage() {
   return (

@@ -4,30 +4,37 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { SlidePanel } from '@/components/ui/SlidePanel'
-import { Loader2, Search } from 'lucide-react'
+import { Loader2, Search, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface InvoiceFormProps {
   open: boolean
   onClose: () => void
-  onCreated: () => void
+  onCreated: (info: { tochkaSent: boolean; number: number }) => void
 }
 
 interface Counterparty {
   inn: string
   kpp?: string
   name: string
-  shortName?: string
   address?: string
+  source: 'auto' | 'manual'
 }
 
 export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
   const [number, setNumber] = useState<number | ''>('')
+  const [numberSource, setNumberSource] = useState<'tochka' | 'local' | null>(null)
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+
   const [inn, setInn] = useState('')
   const [counterparty, setCounterparty] = useState<Counterparty | null>(null)
   const [innLoading, setInnLoading] = useState(false)
-  const [innError, setInnError] = useState('')
+  const [innNotice, setInnNotice] = useState('')
+  const [manualEditing, setManualEditing] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualKpp, setManualKpp] = useState('')
+  const [manualAddress, setManualAddress] = useState('')
+
   const [serviceName, setServiceName] = useState('Услуги по уборке территории')
   const [unit, setUnit] = useState('Услуга')
   const [quantity, setQuantity] = useState(1)
@@ -39,32 +46,71 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
     if (!open) return
     fetch('/api/invoices/next-number')
       .then((r) => r.json())
-      .then((d) => setNumber(d.next))
-      .catch(() => setNumber(1))
+      .then((d) => {
+        setNumber(d.next)
+        setNumberSource(d.source)
+      })
+      .catch(() => {
+        setNumber(1)
+        setNumberSource(null)
+      })
   }, [open])
+
+  function resetCounterparty() {
+    setCounterparty(null)
+    setManualEditing(false)
+    setManualName('')
+    setManualKpp('')
+    setManualAddress('')
+    setInnNotice('')
+  }
 
   async function lookupInn() {
     const cleaned = inn.replace(/\D/g, '')
     if (cleaned.length !== 10 && cleaned.length !== 12) {
-      setInnError('ИНН должен содержать 10 или 12 цифр')
+      setInnNotice('ИНН должен содержать 10 или 12 цифр')
       return
     }
     setInnLoading(true)
-    setInnError('')
+    setInnNotice('')
     setCounterparty(null)
     try {
       const res = await fetch(`/api/counterparties/${cleaned}`)
       if (!res.ok) {
-        setInnError('Контрагент не найден')
+        setInnNotice('Не найдено автоматически — введи данные вручную')
+        setManualEditing(true)
         return
       }
       const data = await res.json()
-      setCounterparty(data)
+      setCounterparty({
+        inn: data.inn,
+        kpp: data.kpp,
+        name: data.name,
+        address: data.address,
+        source: 'auto',
+      })
     } catch {
-      setInnError('Ошибка при поиске')
+      setInnNotice('Ошибка поиска — введи данные вручную')
+      setManualEditing(true)
     } finally {
       setInnLoading(false)
     }
+  }
+
+  function confirmManual() {
+    const cleaned = inn.replace(/\D/g, '')
+    if (!manualName.trim() || !cleaned) {
+      setInnNotice('Заполни ИНН и название')
+      return
+    }
+    setCounterparty({
+      inn: cleaned,
+      kpp: manualKpp || undefined,
+      name: manualName.trim(),
+      address: manualAddress || undefined,
+      source: 'manual',
+    })
+    setManualEditing(false)
   }
 
   async function submit() {
@@ -89,19 +135,19 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
         }),
       })
       if (res.ok) {
-        onCreated()
+        const created = await res.json()
+        onCreated({ tochkaSent: !!created.tochkaSent, number: created.number })
         onClose()
-        resetForm()
+        resetAll()
       }
     } finally {
       setSaving(false)
     }
   }
 
-  function resetForm() {
+  function resetAll() {
     setInn('')
-    setCounterparty(null)
-    setInnError('')
+    resetCounterparty()
     setPrice('')
     setQuantity(1)
     setVat('none')
@@ -126,7 +172,16 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
     >
       <div className="p-5 space-y-5">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Номер счёта">
+          <Field
+            label="Номер счёта"
+            hint={
+              numberSource === 'tochka'
+                ? 'из документооборота Точки'
+                : numberSource === 'local'
+                ? 'из локальной БД (Точка недоступна)'
+                : undefined
+            }
+          >
             <Input
               type="number"
               value={number}
@@ -142,11 +197,14 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
           <div className="text-[11px] text-text-dim uppercase tracking-wider mb-3 font-semibold">
             Контрагент
           </div>
-          <Field label="ИНН" hint={innError || 'Введи ИНН и нажми кнопку поиска'}>
+          <Field label="ИНН" hint={innNotice || 'Введи ИНН и нажми поиск'}>
             <div className="flex gap-2">
               <Input
                 value={inn}
-                onChange={(e) => setInn(e.target.value)}
+                onChange={(e) => {
+                  setInn(e.target.value)
+                  resetCounterparty()
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && lookupInn()}
                 placeholder="10 или 12 цифр"
               />
@@ -158,13 +216,58 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
 
           {counterparty && (
             <div className="mt-3 bg-bg-elevated border border-border rounded p-3 space-y-1">
-              <div className="text-[13px] text-text font-medium">{counterparty.name}</div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[13px] text-text font-medium leading-snug">{counterparty.name}</div>
+                <button
+                  onClick={() => {
+                    setManualName(counterparty.name)
+                    setManualKpp(counterparty.kpp || '')
+                    setManualAddress(counterparty.address || '')
+                    setManualEditing(true)
+                    setCounterparty(null)
+                  }}
+                  className="text-text-muted hover:text-text shrink-0"
+                  title="Редактировать"
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
+              <div className="text-[11.5px] text-text-muted">ИНН: {counterparty.inn}</div>
               {counterparty.kpp && (
                 <div className="text-[11.5px] text-text-muted">КПП: {counterparty.kpp}</div>
               )}
               {counterparty.address && (
                 <div className="text-[11.5px] text-text-muted">{counterparty.address}</div>
               )}
+              {counterparty.source === 'manual' && (
+                <div className="text-[10.5px] text-warning mt-1">введено вручную</div>
+              )}
+            </div>
+          )}
+
+          {manualEditing && (
+            <div className="mt-3 bg-bg-elevated border border-warning/30 rounded p-3 space-y-2">
+              <Field label="Наименование">
+                <Input
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder='ООО "..."'
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="КПП (опционально)">
+                  <Input value={manualKpp} onChange={(e) => setManualKpp(e.target.value)} />
+                </Field>
+                <Field label="Адрес (опционально)">
+                  <Input value={manualAddress} onChange={(e) => setManualAddress(e.target.value)} />
+                </Field>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="ghost" size="sm" onClick={() => setManualEditing(false)}>
+                  Отмена
+                </Button>
+                <Button size="sm" onClick={confirmManual}>Подтвердить</Button>
+              </div>
             </div>
           )}
         </div>
@@ -173,7 +276,7 @@ export function InvoiceForm({ open, onClose, onCreated }: InvoiceFormProps) {
           <div className="text-[11px] text-text-dim uppercase tracking-wider mb-3 font-semibold">
             Услуга
           </div>
-          <Field label="Название услуги">
+          <Field label="Название">
             <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} />
           </Field>
           <div className="grid grid-cols-3 gap-3 mt-3">

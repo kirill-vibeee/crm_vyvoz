@@ -34,6 +34,8 @@ export function InvoiceList() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
 
+  const [toast, setToast] = useState<{ text: string; tone: 'success' | 'warning' } | null>(null)
+
   function reload() {
     setLoading(true)
     fetch('/api/invoices')
@@ -45,6 +47,24 @@ export function InvoiceList() {
   useEffect(() => {
     reload()
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 4500)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  function handleCreated(info: { tochkaSent: boolean; number: number }) {
+    reload()
+    setToast(
+      info.tochkaSent
+        ? { text: `Счёт №${info.number} создан и отправлен в Точка-банк`, tone: 'success' }
+        : {
+            text: `Счёт №${info.number} сохранён локально (Точка недоступна — проверь TOCHKA_JWT_TOKEN)`,
+            tone: 'warning',
+          }
+    )
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -122,8 +142,20 @@ export function InvoiceList() {
       <InvoiceForm
         open={showForm}
         onClose={() => setShowForm(false)}
-        onCreated={reload}
+        onCreated={handleCreated}
       />
+
+      {toast && (
+        <div
+          className={`fixed bottom-4 right-4 max-w-md rounded border px-4 py-3 text-[13px] shadow-lg animate-[fadeIn_120ms] ${
+            toast.tone === 'success'
+              ? 'bg-success/10 border-success/40 text-success'
+              : 'bg-warning/10 border-warning/40 text-warning'
+          }`}
+        >
+          {toast.text}
+        </div>
+      )}
     </div>
   )
 }
