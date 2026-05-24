@@ -27,6 +27,7 @@ export function KanbanBoard({ initialDealId, onDealSelect }: KanbanBoardProps = 
   const [loading, setLoading] = useState(true)
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -61,14 +62,22 @@ export function KanbanBoard({ initialDealId, onDealSelect }: KanbanBoardProps = 
   }, [deals])
 
   async function handleCreate(title: string) {
-    const res = await fetch('/api/deals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, stage: 'NEW' }),
-    })
-    if (res.ok) {
+    setError(null)
+    try {
+      const res = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, stage: 'NEW' }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body?.error || `Сервер ответил ${res.status}`)
+        return
+      }
       const deal = await res.json()
       setDeals((prev) => [deal, ...prev])
+    } catch (err: any) {
+      setError(err?.message || 'Сетевая ошибка')
     }
   }
 
@@ -179,6 +188,19 @@ export function KanbanBoard({ initialDealId, onDealSelect }: KanbanBoardProps = 
         onUpdate={handleUpdate}
         onDelete={handleDelete}
       />
+
+      {error && (
+        <div className="fixed bottom-4 right-4 max-w-md rounded border border-danger/40 bg-danger/10 text-danger px-4 py-3 text-[13px] shadow-lg z-50">
+          <div className="font-semibold mb-1">Не удалось создать сделку</div>
+          <div className="text-[12px] opacity-90 break-words">{error}</div>
+          <button
+            onClick={() => setError(null)}
+            className="mt-2 text-[11px] underline"
+          >
+            закрыть
+          </button>
+        </div>
+      )}
     </div>
   )
 }

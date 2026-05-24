@@ -18,29 +18,55 @@ async function getDefaultUserId() {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const stage = searchParams.get('stage')
+  try {
+    const { searchParams } = new URL(request.url)
+    const stage = searchParams.get('stage')
 
-  const deals = await prisma.deal.findMany({
-    where: stage ? { stage: stage as any } : undefined,
-    include: { responsible: true, files: true, comments: true },
-    orderBy: { createdAt: 'desc' },
-  })
+    const deals = await prisma.deal.findMany({
+      where: stage ? { stage: stage as any } : undefined,
+      include: { responsible: true, files: true, comments: true },
+      orderBy: { createdAt: 'desc' },
+    })
 
-  return NextResponse.json(deals)
+    return NextResponse.json(deals)
+  } catch (err: any) {
+    console.error('[GET /api/deals] error:', err)
+    return NextResponse.json({ error: err?.message || 'load failed' }, { status: 500 })
+  }
 }
 
 export async function POST(request: NextRequest) {
-  const data = await request.json()
-  const responsibleId = await getDefaultUserId()
+  try {
+    const data = await request.json()
+    const responsibleId = await getDefaultUserId()
 
-  const deal = await prisma.deal.create({
-    data: {
-      ...data,
-      responsibleId,
-    },
-    include: { responsible: true, files: true },
-  })
+    // Whitelist полей — иначе spread может пихнуть лишнее и вызвать unknown column
+    const ALLOWED = [
+      'title', 'stage', 'status', 'source',
+      'budgetClient', 'budgetContractor',
+      'orderDate', 'reminderDate', 'reminderTime',
+      'contactName', 'contactPhone', 'contactEmail', 'contactTelegram',
+      'contractorName', 'contractorPhone', 'contractorTgHandle',
+      'address', 'city', 'notes',
+    ]
+    const safeData: any = {}
+    for (const k of ALLOWED) if (k in data) safeData[k] = data[k]
 
-  return NextResponse.json(deal, { status: 201 })
+    const deal = await prisma.deal.create({
+      data: {
+        ...safeData,
+        title: safeData.title || 'Новая сделка',
+        responsibleId,
+      },
+      include: { responsible: true, files: true },
+    })
+
+    return NextResponse.json(deal, { status: 201 })
+  } catch (err: any) {
+    console.error('[POST /api/deals] error:', err)
+    return NextResponse.json(
+      { error: err?.message || 'Ошибка создания сделки', code: err?.code },
+      { status: 500 }
+    )
+  }
 }

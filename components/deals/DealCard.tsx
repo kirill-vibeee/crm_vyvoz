@@ -36,8 +36,10 @@ export function DealCard({ deal, onClick }: DealCardProps) {
   const sourceLabel = deal.source ? SOURCE_OPTIONS.find((s) => s.value === deal.source)?.label : null
   const statusLabel = deal.status ? STATUS_OPTIONS.find((s) => s.value === deal.status)?.label : null
   const budget = fmtMoney(deal.budgetClient)
-  const date = deal.orderDate || deal.reminderDate
+  const isFinal = deal.stage === 'COMPLETED' || deal.stage === 'REFUSED'
+  const date = isFinal ? deal.completedAt : (deal.orderDate || deal.reminderDate)
   const dateStr = date ? format(new Date(date), 'd MMM', { locale: ru }) : null
+  const dateLabel = isFinal ? 'закрыта' : null
 
   return (
     <div
@@ -73,7 +75,8 @@ export function DealCard({ deal, onClick }: DealCardProps) {
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-text-muted">
         {dateStr && (
           <span className="inline-flex items-center gap-1">
-            <Calendar size={10} strokeWidth={2} /> {dateStr}
+            <Calendar size={10} strokeWidth={2} />
+            {dateLabel ? `${dateLabel} ${dateStr}` : dateStr}
           </span>
         )}
         {deal.reminderTime && (
