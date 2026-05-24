@@ -110,6 +110,9 @@ enum Source {
   REFERRAL
   RECURRING
   OTHER
+  // Legacy (импортированные сделки из Amo могут иметь эти значения):
+  YANDEX_DIRECT
+  YANDEX_MAPS
 }
 
 // ─────────────────────────────────────────────
