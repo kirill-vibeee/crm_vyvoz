@@ -1,116 +1,165 @@
 'use client'
 
-import { DEAL_STAGES } from '@/types'
-import { Deal } from '@prisma/client'
-import { useEffect, useState } from 'react'
-import { CreateDealForm } from './CreateDealForm'
-import { DealModal } from './DealModal'
+import { Deal, DealStageId, PIPELINE_STAGES, REFUSED_STAGE } from '@/types'
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { useEffect, useMemo, useState } from 'react'
+import { DealCard } from './DealCard'
+import { DealDetailPanel } from './DealDetailPanel'
+import { KanbanColumn } from './KanbanColumn'
+import { RefusedDropZone } from './RefusedDropZone'
 
 export function KanbanBoard() {
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeDeal, setActiveDeal] = useState<Deal | null>(null)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
-  const [showModal, setShowModal] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  )
 
   useEffect(() => {
-    fetchDeals()
+    fetch('/api/deals')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setDeals(data)
+      })
+      .finally(() => setLoading(false))
   }, [])
 
-  async function fetchDeals() {
-    const res = await fetch('/api/deals')
-    if (res.ok) {
-      setDeals(await res.json())
+  const dealsByStage = useMemo(() => {
+    const map: Record<string, Deal[]> = {}
+    for (const stage of [...PIPELINE_STAGES, REFUSED_STAGE]) {
+      map[stage.id] = []
     }
-    setLoading(false)
+    for (const deal of deals) {
+      const list = map[deal.stage as DealStageId]
+      if (list) list.push(deal)
+    }
+    return map
+  }, [deals])
+
+  async function handleCreate(title: string) {
+    const res = await fetch('/api/deals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, stage: 'NEW' }),
+    })
+    if (res.ok) {
+      const deal = await res.json()
+      setDeals((prev) => [deal, ...prev])
+    }
   }
 
-  async function handleDealStageChange(dealId: string, newStage: string) {
-    const res = await fetch(`/api/deals/${dealId}/stage`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stage: newStage }),
-    })
+  function handleDragStart(event: DragStartEvent) {
+    const deal = deals.find((d) => d.id === event.active.id)
+    setActiveDeal(deal || null)
+  }
 
-    if (res.ok) {
-      setDeals(deals.map((d) => (d.id === dealId ? { ...d, stage: newStage as any } : d)))
+  async function handleDragEnd(event: DragEndEvent) {
+    setActiveDeal(null)
+    const { active, over } = event
+    if (!over) return
+
+    const dragged = deals.find((d) => d.id === active.id)
+    if (!dragged) return
+
+    let targetStage = over.data?.current?.stageId as DealStageId | undefined
+    if (!targetStage) {
+      const overDeal = deals.find((d) => d.id === over.id)
+      if (overDeal) targetStage = overDeal.stage as DealStageId
     }
+    if (!targetStage || targetStage === dragged.stage) return
+
+    const originalStage = dragged.stage
+    setDeals((prev) =>
+      prev.map((d) => (d.id === dragged.id ? { ...d, stage: targetStage! } : d))
+    )
+
+    try {
+      const res = await fetch(`/api/deals/${dragged.id}/stage`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: targetStage }),
+      })
+      if (!res.ok) throw new Error('failed')
+    } catch {
+      setDeals((prev) =>
+        prev.map((d) => (d.id === dragged.id ? { ...d, stage: originalStage } : d))
+      )
+    }
+  }
+
+  function handleUpdate(updated: Deal) {
+    setDeals((prev) => prev.map((d) => (d.id === updated.id ? updated : d)))
+    setSelectedDeal(updated)
+  }
+
+  async function handleDelete(id: string) {
+    setDeals((prev) => prev.filter((d) => d.id !== id))
+    setSelectedDeal(null)
+    await fetch(`/api/deals/${id}`, { method: 'DELETE' })
   }
 
   if (loading) {
-    return <div className="p-8 text-text-muted">Загрузка...</div>
+    return (
+      <div className="h-full flex items-center justify-center text-text-muted text-sm">
+        Загрузка…
+      </div>
+    )
   }
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-text-primary mb-2">Сделки</h1>
-      <p className="text-text-muted text-sm mb-8">Управление заявками по вывозу мусора</p>
+    <div className="h-full flex flex-col">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+          <div className="flex gap-3 h-full px-4 pt-4 pb-2 min-h-0">
+            {PIPELINE_STAGES.map((stage) => (
+              <KanbanColumn
+                key={stage.id}
+                stage={stage}
+                deals={dealsByStage[stage.id] || []}
+                onCardClick={setSelectedDeal}
+                onCreate={stage.id === 'NEW' ? handleCreate : undefined}
+              />
+            ))}
+          </div>
+        </div>
 
-      <CreateDealForm onSuccess={fetchDeals} />
-
-      <div className="grid auto-cols-max gap-6 overflow-x-auto pb-4">
-        {DEAL_STAGES.map((stageConfig) => {
-          const stageDeal = deals.filter((d) => d.stage === stageConfig.value)
-          const stageBudget = stageDeal.reduce((sum, d) => sum + (d.budgetClient || 0), 0)
-
-          return (
-            <div
-              key={stageConfig.value}
-              className="min-w-96 bg-surface border border-border rounded-lg p-4 flex flex-col max-h-[calc(100vh-300px)]"
-            >
-              <div className={`${stageConfig.color} text-white px-3 py-2 rounded text-sm font-medium mb-3 w-full text-center`}>
-                {stageConfig.label}
-              </div>
-
-              <div className="text-xs text-text-muted mb-4 flex justify-between">
-                <span>{stageDeal.length} сделок</span>
-                {stageBudget > 0 && <span className="text-accent font-medium">{stageBudget} ₽</span>}
-              </div>
-
-              <div className="flex-1 space-y-3 overflow-y-auto">
-                {stageDeal.map((deal) => (
-                  <div
-                    key={deal.id}
-                    onClick={() => {
-                      setSelectedDeal(deal)
-                      setShowModal(true)
-                    }}
-                    className="bg-background border border-border rounded p-3 text-sm cursor-pointer hover:border-accent hover:shadow-md transition-all"
-                  >
-                    <p className="font-medium text-text-primary truncate">{deal.title}</p>
-                    {deal.budgetClient && (
-                      <p className="text-xs text-accent mt-2 font-medium">{deal.budgetClient} ₽</p>
-                    )}
-                    {deal.contractorName && (
-                      <p className="text-xs text-text-muted mt-1">Исп: {deal.contractorName}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {stageDeal.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-text-muted text-xs">Нет сделок</p>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {showModal && selectedDeal && (
-        <DealModal
-          deal={selectedDeal}
-          allDeals={deals}
-          onClose={() => {
-            setShowModal(false)
-            setSelectedDeal(null)
-          }}
-          onUpdate={(updated) => {
-            setDeals(deals.map((d) => (d.id === updated.id ? updated : d)))
-            setSelectedDeal(updated)
-          }}
+        <RefusedDropZone
+          deals={dealsByStage[REFUSED_STAGE.id] || []}
+          onCardClick={setSelectedDeal}
         />
-      )}
+
+        <DragOverlay>
+          {activeDeal && (
+            <div className="rotate-2 opacity-95 cursor-grabbing">
+              <DealCard deal={activeDeal} onClick={() => {}} />
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+
+      <DealDetailPanel
+        deal={selectedDeal}
+        onClose={() => setSelectedDeal(null)}
+        onUpdate={handleUpdate}
+        onDelete={handleDelete}
+      />
     </div>
   )
 }

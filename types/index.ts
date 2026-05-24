@@ -1,42 +1,63 @@
-import { User as PrismaUser, Deal as PrismaDeal, DealStage, DealStatus, Source, Role } from "@prisma/client"
+import { Deal as PrismaDeal, User as PrismaUser } from "@prisma/client"
 
-export interface User extends PrismaUser {
-  role: Role
-}
-
-export interface Deal extends PrismaDeal {
-  responsible?: User
+export type Deal = PrismaDeal & {
+  responsible?: PrismaUser | null
   files?: any[]
   comments?: any[]
+  activities?: any[]
 }
 
-export enum DealStageName {
-  NEW = "Новая заявка",
-  AWAITING_DECISION = "Ожидаем решение",
-  WAITING = "Ожидаем (фото/ответ)",
-  DEFERRED = "Будущие отложенные",
-  AGREED_FINDING = "Согласовано, ищем исполнителя",
-  IN_PROGRESS = "Заявка в работе",
-  COMPLETED = "Успешно реализована",
-  REFUSED = "Отказ",
+export type DealStageId =
+  | 'NEW'
+  | 'AWAITING_DECISION'
+  | 'DEFERRED'
+  | 'AGREED_FINDING'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'REFUSED'
+
+export interface StageConfig {
+  id: DealStageId
+  label: string
+  short: string
+  accent: string
+  dot: string
 }
 
-export const DEAL_STAGES = [
-  { value: "NEW", label: DealStageName.NEW, color: "bg-gray-600" },
-  { value: "AWAITING_DECISION", label: DealStageName.AWAITING_DECISION, color: "bg-yellow-600" },
-  { value: "WAITING", label: DealStageName.WAITING, color: "bg-orange-600" },
-  { value: "DEFERRED", label: DealStageName.DEFERRED, color: "bg-purple-600" },
-  { value: "AGREED_FINDING", label: DealStageName.AGREED_FINDING, color: "bg-blue-600" },
-  { value: "IN_PROGRESS", label: DealStageName.IN_PROGRESS, color: "bg-indigo-600" },
-  { value: "COMPLETED", label: DealStageName.COMPLETED, color: "bg-green-600" },
-  { value: "REFUSED", label: DealStageName.REFUSED, color: "bg-red-600" },
+// Order matters: rendered left-to-right. REFUSED is the bottom drop-zone (not in this array).
+export const PIPELINE_STAGES: StageConfig[] = [
+  { id: 'NEW',               label: 'Новая заявка',                short: 'NEW',        accent: '#8A8F98', dot: 'bg-text-muted' },
+  { id: 'AWAITING_DECISION', label: 'Ожидаем решения',             short: 'AWAITING',   accent: '#F2C94C', dot: 'bg-yellow-400' },
+  { id: 'DEFERRED',          label: 'Будущее / Отложенное',        short: 'DEFERRED',   accent: '#BB6BD9', dot: 'bg-purple-400' },
+  { id: 'AGREED_FINDING',    label: 'Согласовано / Ищем исп.',     short: 'AGREED',     accent: '#5E6AD2', dot: 'bg-accent' },
+  { id: 'IN_PROGRESS',       label: 'Исполнитель найден / В работе', short: 'IN_PROGRESS', accent: '#56CCF2', dot: 'bg-cyan-400' },
+  { id: 'COMPLETED',         label: 'Успешно реализована',         short: 'DONE',       accent: '#4CB782', dot: 'bg-success' },
 ]
 
-export interface Session {
-  user: {
-    id: string
-    email: string
-    name: string
-    role: Role
-  }
+export const REFUSED_STAGE: StageConfig = {
+  id: 'REFUSED',
+  label: 'Отказ',
+  short: 'REFUSED',
+  accent: '#C1543C',
+  dot: 'bg-danger',
 }
+
+export const ALL_STAGES: StageConfig[] = [...PIPELINE_STAGES, REFUSED_STAGE]
+
+export const SOURCE_OPTIONS = [
+  { value: 'AVITO', label: 'Avito' },
+  { value: 'YANDEX_DIRECT', label: 'Яндекс.Директ' },
+  { value: 'YANDEX_MAPS', label: 'Яндекс.Карты' },
+  { value: 'WEBSITE', label: 'Сайт' },
+  { value: 'REFERRAL', label: 'Сарафан' },
+  { value: 'OTHER', label: 'Другое' },
+]
+
+export const STATUS_OPTIONS = [
+  { value: 'WAITING_ANSWER', label: 'Ждём ответ' },
+  { value: 'AGREED', label: 'Согласовано' },
+  { value: 'CALL', label: 'Позвонить' },
+  { value: 'CLARIFY', label: 'Уточнить' },
+  { value: 'WRITE', label: 'Написать' },
+  { value: 'WAITING_PHOTO', label: 'Ждём фото' },
+]

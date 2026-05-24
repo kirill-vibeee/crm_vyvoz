@@ -78,7 +78,6 @@ model Deal {
 enum DealStage {
   NEW
   AWAITING_DECISION
-  WAITING
   DEFERRED
   AGREED_FINDING
   IN_PROGRESS
@@ -175,4 +174,40 @@ enum ExpenseCategory {
   SALARY
   SOFTWARE
   OTHER
+}
+
+// ─────────────────────────────────────────────
+// INVOICES (выставление счетов через Точка-банк)
+// ─────────────────────────────────────────────
+
+model Invoice {
+  id                  String   @id @default(cuid())
+  number              Int
+  date                DateTime
+
+  counterpartyInn     String
+  counterpartyName    String
+  counterpartyKpp     String?
+  counterpartyAddress String?
+
+  serviceName String  @default("Услуги по уборке территории")
+  unit        String  @default("Услуга")
+  quantity    Float   @default(1)
+  price       Float
+  withVat     Boolean @default(false)
+  total       Float
+
+  tochkaId    String?
+  pdfUrl      String?
+  status      InvoiceStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  CANCELLED
 }

@@ -1,24 +1,89 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0F0F0F;
-  --surface: #1A1A1A;
-  --border: #2A2A2A;
-  --text-primary: #F5F5F5;
-  --text-muted: #888888;
-  --accent: #4F7EFF;
-  --success: #22C55E;
-  --warning: #F59E0B;
-  --danger: #EF4444;
+  --bg: #08090A;
+  --bg-elevated: #101113;
+  --surface: #16181C;
+  --surface-hover: #1C1E22;
+  --border: #23262D;
+  --border-hover: #2E323C;
+  --text: #E6E7E8;
+  --text-muted: #8A8F98;
+  --text-dim: #5C606A;
+  --accent: #5E6AD2;
+  --accent-hover: #6B7DD8;
+  --accent-soft: rgba(94, 106, 210, 0.12);
+  --success: #4CB782;
+  --warning: #F2994A;
+  --danger: #C1543C;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
 }
 
 html {
   color-scheme: dark;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background-color: var(--background);
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
 }
