@@ -70,6 +70,10 @@ model Deal {
   updatedAt        DateTime    @updatedAt
   completedAt      DateTime?
 
+  // External integrations
+  amoLeadId        BigInt?     @unique
+  source_system    String?     // "amo" | "manual" | null
+
   files            DealFile[]
   comments         Comment[]
   activities       Activity[]

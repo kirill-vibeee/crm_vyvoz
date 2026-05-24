@@ -1,3 +1,4 @@
+import { checkAmoConnection } from '@/lib/amocrm'
 import { resolveAccount } from '@/lib/tochka'
 import { lookupCounterpartyByInn } from '@/lib/inn'
 import { NextResponse } from 'next/server'
@@ -40,8 +41,11 @@ export async function GET() {
     dadataError = `DaData: ${err?.message || err}`
   }
 
+  const amo = await checkAmoConnection()
+
   return NextResponse.json({
     tochka: { ok: tochkaOk, hasToken: !!token, customerCode, accountId, error: tochkaError },
     dadata: { ok: dadataOk, hasOwnKey: !!process.env.DADATA_API_KEY, error: dadataError },
+    amo: { ok: amo.ok, subdomain: amo.subdomain, error: amo.error || null },
   })
 }

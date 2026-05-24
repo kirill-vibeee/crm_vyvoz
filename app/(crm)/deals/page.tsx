@@ -1,13 +1,17 @@
+'use client'
+
+import { DealsHeader } from '@/components/deals/DealsHeader'
 import { KanbanBoard } from '@/components/deals/KanbanBoard'
+import { useState } from 'react'
 
 export default function DealsPage() {
+  const [reloadKey, setReloadKey] = useState(0)
+
   return (
     <div className="h-full flex flex-col">
-      <header className="h-12 px-4 flex items-center justify-between border-b border-border shrink-0">
-        <h1 className="text-[13px] font-semibold text-text">Сделки</h1>
-      </header>
+      <DealsHeader onSyncDone={() => setReloadKey((k) => k + 1)} />
       <div className="flex-1 min-h-0">
-        <KanbanBoard />
+        <KanbanBoard key={reloadKey} />
       </div>
     </div>
   )

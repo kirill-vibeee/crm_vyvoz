@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
+// Поддержка BigInt в JSON.stringify (Prisma возвращает BigInt для @id BigInt полей)
+;(BigInt.prototype as any).toJSON = function () {
+  return this.toString()
+}
+
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
 function createPrismaClient() {
