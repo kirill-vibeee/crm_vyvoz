@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { normalizePhone } from '@/lib/phone'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
@@ -35,7 +36,7 @@ export async function PATCH(
   // Only update fields that were provided
   const updateData: any = {}
   const ALLOWED = [
-    'title', 'stage', 'status', 'source',
+    'title', 'stage', 'status', 'source', 'responsibleId',
     'budgetClient', 'budgetContractor',
     'orderDate', 'reminderDate', 'reminderTime',
     'contactName', 'contactPhone', 'contactEmail', 'contactTelegram',
@@ -44,6 +45,13 @@ export async function PATCH(
   ]
   for (const k of ALLOWED) {
     if (k in data) updateData[k] = data[k]
+  }
+  // Стандартизация телефонов
+  if ('contactPhone' in updateData && updateData.contactPhone) {
+    updateData.contactPhone = normalizePhone(updateData.contactPhone)
+  }
+  if ('contractorPhone' in updateData && updateData.contractorPhone) {
+    updateData.contractorPhone = normalizePhone(updateData.contractorPhone)
   }
   if (profit !== undefined) updateData.profit = profit
   if (managerProfit !== undefined) updateData.managerProfit = managerProfit

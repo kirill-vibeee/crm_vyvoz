@@ -1,3 +1,5 @@
+import { MobileMenuButton } from '@/components/layout/MobileMenuButton'
+
 const CALC_URL =
   process.env.NEXT_PUBLIC_CALCULATOR_URL ||
   'https://waste-calculator-production.up.railway.app/static/index.html'
@@ -6,6 +8,7 @@ export default function CalculatorPage() {
   return (
     <div className="h-full flex flex-col">
       <header className="h-12 px-4 flex items-center border-b border-border shrink-0">
+        <MobileMenuButton />
         <h1 className="text-[13px] font-semibold text-text">AI калькулятор</h1>
       </header>
       <div className="flex-1 min-h-0 p-3 md:p-4">

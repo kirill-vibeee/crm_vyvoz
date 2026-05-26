@@ -2,8 +2,10 @@
 
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
+import { MobileMenuButton } from '@/components/layout/MobileMenuButton'
 import { DealDetailPanel } from '@/components/deals/DealDetailPanel'
 import { autoDealTitle } from '@/lib/dealTitle'
+import { formatMoney } from '@/lib/money'
 import { ALL_STAGES, Deal, SOURCE_OPTIONS } from '@/types'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -11,10 +13,7 @@ import { ArrowDown, ArrowUp, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 function fmtMoney(n?: number | null) {
-  if (n == null) return '—'
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М ₽'
-  if (n >= 1_000) return (n / 1000).toFixed(1) + 'К ₽'
-  return new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
+  return formatMoney(n)
 }
 
 type SortKey = 'orderDate' | 'createdAt' | 'updatedAt' | 'completedAt' | 'budget' | 'stage'
@@ -105,7 +104,10 @@ export function DealsList() {
   return (
     <div className="h-full flex flex-col">
       <header className="h-12 px-4 flex items-center justify-between border-b border-border shrink-0">
-        <h1 className="text-[13px] font-semibold text-text">Все сделки</h1>
+        <div className="flex items-center gap-1">
+          <MobileMenuButton />
+          <h1 className="text-[13px] font-semibold text-text">Все сделки</h1>
+        </div>
         <div className="text-[12px] text-text-muted">{filtered.length} из {deals.length}</div>
       </header>
 

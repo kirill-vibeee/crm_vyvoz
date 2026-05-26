@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { autoDealTitle } from '@/lib/dealTitle'
+import { formatMoney as fmtFull } from '@/lib/money'
 import { ALL_STAGES, Deal, DealStageId, SOURCE_OPTIONS, STATUS_OPTIONS } from '@/types'
 import { MessageSquare, Settings2, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -19,8 +20,7 @@ interface DealDetailPanelProps {
 }
 
 function formatMoney(n?: number | null) {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
+  return fmtFull(n)
 }
 
 function orderDateLabel(stage: DealStageId): string {
@@ -35,6 +35,15 @@ export function DealDetailPanel({ deal, onClose, onUpdate, onDelete }: DealDetai
   const [form, setForm] = useState<Partial<Deal>>({})
   const [saving, setSaving] = useState(false)
   const [mobileTab, setMobileTab] = useState<Tab>('fields')
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    if (!deal) return
+    fetch('/api/users')
+      .then((r) => r.json())
+      .then((d) => setUsers(Array.isArray(d) ? d : []))
+      .catch(() => setUsers([]))
+  }, [deal])
 
   useEffect(() => {
     if (deal) {
@@ -70,6 +79,7 @@ export function DealDetailPanel({ deal, onClose, onUpdate, onDelete }: DealDetai
           stage: form.stage,
           status: form.status || null,
           source: form.source || null,
+          responsibleId: form.responsibleId || undefined,
           budgetClient: form.budgetClient ? Number(form.budgetClient) : null,
           budgetContractor: form.budgetContractor ? Number(form.budgetContractor) : null,
           contactName: form.contactName || null,
@@ -181,14 +191,23 @@ export function DealDetailPanel({ deal, onClose, onUpdate, onDelete }: DealDetai
                 </Field>
               </div>
 
-              <Field label="Источник">
-                <Select
-                  value={form.source || ''}
-                  onChange={(e) => set('source', e.target.value || null)}
-                  placeholder="—"
-                  options={SOURCE_OPTIONS}
-                />
-              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Источник">
+                  <Select
+                    value={form.source || ''}
+                    onChange={(e) => set('source', e.target.value || null)}
+                    placeholder="—"
+                    options={SOURCE_OPTIONS}
+                  />
+                </Field>
+                <Field label="Ответственный">
+                  <Select
+                    value={form.responsibleId || ''}
+                    onChange={(e) => set('responsibleId', e.target.value || null)}
+                    options={users.map((u) => ({ value: u.id, label: u.name }))}
+                  />
+                </Field>
+              </div>
 
               <DealContactSection
                 values={{
@@ -312,7 +331,14 @@ export function DealDetailPanel({ deal, onClose, onUpdate, onDelete }: DealDetai
               mobileTab === 'chat' ? 'flex-1' : 'hidden md:block'
             }`}
           >
-            <DealChatPane dealId={deal.id} />
+            <DealChatPane
+              dealId={deal.id}
+              context={{
+                budgetClient: Number(form.budgetClient) || null,
+                contactName: form.contactName,
+                address: form.address,
+              }}
+            />
           </div>
         </div>
 

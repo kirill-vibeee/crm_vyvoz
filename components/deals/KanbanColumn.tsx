@@ -1,5 +1,6 @@
 'use client'
 
+import { formatMoney, formatMoneyShort } from '@/lib/money'
 import { Deal, StageConfig } from '@/types'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -11,12 +12,6 @@ interface KanbanColumnProps {
   deals: Deal[]
   onCardClick: (deal: Deal) => void
   onCreate?: (title: string) => Promise<void>
-}
-
-function fmtMoney(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М ₽'
-  if (n >= 1_000) return Math.round(n / 1000) + 'К ₽'
-  return n + ' ₽'
 }
 
 export function KanbanColumn({ stage, deals, onCardClick, onCreate }: KanbanColumnProps) {
@@ -35,8 +30,8 @@ export function KanbanColumn({ stage, deals, onCardClick, onCreate }: KanbanColu
           {deals.length}
         </span>
         {totalBudget > 0 && (
-          <span className="text-[10.5px] text-text-dim ml-auto font-mono">
-            {fmtMoney(totalBudget)}
+          <span className="text-[10.5px] text-text-dim ml-auto font-mono" title={formatMoney(totalBudget)}>
+            {formatMoneyShort(totalBudget)}
           </span>
         )}
       </div>

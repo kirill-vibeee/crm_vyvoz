@@ -1,7 +1,8 @@
 'use client'
 
 import { Textarea } from '@/components/ui/Input'
-import { ArrowDownLeft, ArrowUpRight, Loader2, MessageSquare, Phone, Send, StickyNote } from 'lucide-react'
+import { MESSAGE_TEMPLATES, applyTemplate } from '@/lib/templates'
+import { ArrowDownLeft, ArrowUpRight, Loader2, MessageSquare, Phone, Send, Sparkles, StickyNote } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -23,17 +24,75 @@ const CHANNELS = [
   { value: 'CALL', label: 'Звонок', icon: Phone },
 ]
 
-interface Props {
-  dealId: string
+interface DealContext {
+  budgetClient?: number | null
+  contactName?: string | null
+  address?: string | null
 }
 
-export function DealChatPane({ dealId }: Props) {
+interface Props {
+  dealId: string
+  context?: DealContext
+}
+
+export function DealChatPane({ dealId, context }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [channel, setChannel] = useState<Message['channel']>('TG')
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [templateFilter, setTemplateFilter] = useState('')
+  const [templateIndex, setTemplateIndex] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const filteredTemplates = MESSAGE_TEMPLATES.filter((t) =>
+    !templateFilter ||
+    t.shortcut.toLowerCase().includes(templateFilter.toLowerCase()) ||
+    t.label.toLowerCase().includes(templateFilter.toLowerCase())
+  )
+
+  function insertTemplate(t: { shortcut: string; text: string }) {
+    const applied = applyTemplate(t.text, {
+      budget: context?.budgetClient,
+      name: context?.contactName,
+      address: context?.address,
+    })
+    setText(applied)
+    setTemplatesOpen(false)
+    setTemplateFilter('')
+    setTimeout(() => textareaRef.current?.focus(), 50)
+  }
+
+  function handleTextChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value
+    setText(val)
+    // Открыть шаблоны если строка начинается с "/"
+    if (val.startsWith('/')) {
+      setTemplatesOpen(true)
+      setTemplateFilter(val.slice(1))
+      setTemplateIndex(0)
+    } else {
+      setTemplatesOpen(false)
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (!templatesOpen) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setTemplateIndex((i) => Math.min(i + 1, filteredTemplates.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setTemplateIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter' && filteredTemplates[templateIndex]) {
+      e.preventDefault()
+      insertTemplate(filteredTemplates[templateIndex])
+    } else if (e.key === 'Escape') {
+      setTemplatesOpen(false)
+    }
+  }
 
   function reload() {
     setLoading(true)
@@ -143,17 +202,45 @@ export function DealChatPane({ dealId }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-border p-2 shrink-0 space-y-1.5">
+      <div className="border-t border-border p-2 shrink-0 space-y-1.5 relative">
+        {templatesOpen && filteredTemplates.length > 0 && (
+          <div className="absolute bottom-full left-2 right-2 mb-2 bg-bg-elevated border border-border rounded shadow-lg max-h-60 overflow-y-auto z-10">
+            <div className="text-[10px] text-text-dim px-2.5 py-1.5 border-b border-border uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles size={10} /> Шаблоны · ↑↓ выбор, Enter вставить
+            </div>
+            {filteredTemplates.map((t, i) => (
+              <button
+                key={t.shortcut}
+                type="button"
+                onClick={() => insertTemplate(t)}
+                onMouseEnter={() => setTemplateIndex(i)}
+                className={`block w-full text-left px-2.5 py-1.5 hover:bg-surface-hover ${
+                  i === templateIndex ? 'bg-surface-hover' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-accent">{t.shortcut}</span>
+                  <span className="text-[12px] text-text">{t.label}</span>
+                </div>
+                <div className="text-[11px] text-text-muted line-clamp-1 mt-0.5">
+                  {t.text}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
         <Textarea
+          ref={textareaRef}
           rows={2}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleTextChange}
+          onKeyDown={handleKeyDown}
           placeholder={
             channel === 'NOTE'
               ? 'Заметка по сделке…'
               : channel === 'CALL'
               ? 'Что обсудили по телефону…'
-              : 'Текст сообщения…'
+              : 'Сообщение… (введи / для шаблонов)'
           }
           disabled={sending}
         />

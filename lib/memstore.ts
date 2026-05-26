@@ -24,13 +24,24 @@ const dealFiles = new Map<string, any>()
 const comments = new Map<string, any>()
 const activities = new Map<string, any>()
 
-// Seed: дефолтный пользователь
+// Seed: дефолтные пользователи
 const DEFAULT_USER_ID = id()
 users.set(DEFAULT_USER_ID, {
   id: DEFAULT_USER_ID,
   email: 'kirill@example.com',
   name: 'Кирилл',
   role: 'ADMIN',
+  passwordHash: '',
+  createdAt: now(),
+  updatedAt: now(),
+})
+
+const VLAD_USER_ID = id()
+users.set(VLAD_USER_ID, {
+  id: VLAD_USER_ID,
+  email: 'vlad@example.com',
+  name: 'Влад',
+  role: 'MANAGER',
   passwordHash: '',
   createdAt: now(),
   updatedAt: now(),

@@ -1,6 +1,7 @@
 'use client'
 
 import { autoDealTitle } from '@/lib/dealTitle'
+import { formatMoney } from '@/lib/money'
 import { Deal, SOURCE_OPTIONS, STATUS_OPTIONS } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -15,9 +16,7 @@ interface DealCardProps {
 
 function fmtMoney(n?: number | null) {
   if (n == null) return null
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М ₽'
-  if (n >= 1_000) return Math.round(n / 1000) + 'К ₽'
-  return new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
+  return formatMoney(n)
 }
 
 export function DealCard({ deal, onClick }: DealCardProps) {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, Calculator, FileText, Kanban, List, LucideIcon, X } from 'lucide-react'
+import { BarChart3, Calculator, FileText, Kanban, List, LucideIcon, Users, X } from 'lucide-react'
 
 interface NavItem {
   label: string
@@ -13,6 +13,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Сделки', href: '/deals', icon: Kanban },
   { label: 'Все сделки', href: '/list', icon: List },
+  { label: 'Контакты', href: '/contacts', icon: Users },
   { label: 'AI калькулятор', href: '/calculator', icon: Calculator },
   { label: 'Счета', href: '/invoices', icon: FileText },
   { label: 'Статистика', href: '/stats', icon: BarChart3 },

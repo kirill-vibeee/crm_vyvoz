@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/Button'
+import { MobileMenuButton } from '@/components/layout/MobileMenuButton'
 import { CheckCircle2, Download, Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -50,7 +51,8 @@ export function DealsHeader({ onSyncDone }: DealsHeaderProps) {
   return (
     <>
       <header className="h-12 px-4 flex items-center justify-between border-b border-border shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <MobileMenuButton />
           <h1 className="text-[13px] font-semibold text-text">Сделки</h1>
         </div>
         <div className="flex items-center gap-2">

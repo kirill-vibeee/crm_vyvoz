@@ -1,5 +1,7 @@
 'use client'
 
+import { MobileMenuButton } from '@/components/layout/MobileMenuButton'
+import { formatMoney } from '@/lib/money'
 import { SOURCE_OPTIONS } from '@/types'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -33,9 +35,7 @@ interface StatsData {
 const PIE_COLORS = ['#5E6AD2', '#4CB782', '#F2C94C', '#BB6BD9', '#56CCF2']
 
 function fmtMoney(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М ₽'
-  if (n >= 1_000) return (n / 1000).toFixed(1) + 'К ₽'
-  return new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
+  return formatMoney(n)
 }
 
 const PERIODS = [
@@ -87,7 +87,10 @@ export function StatsView() {
   return (
     <div className="h-full flex flex-col">
       <header className="h-12 px-4 flex items-center justify-between border-b border-border shrink-0">
-        <h1 className="text-[13px] font-semibold text-text">Статистика</h1>
+        <div className="flex items-center gap-1">
+          <MobileMenuButton />
+          <h1 className="text-[13px] font-semibold text-text">Статистика</h1>
+        </div>
         <div className="flex gap-1">
           {PERIODS.map((p) => (
             <button

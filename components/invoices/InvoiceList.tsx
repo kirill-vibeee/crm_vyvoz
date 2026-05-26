@@ -2,8 +2,10 @@
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { MobileMenuButton } from '@/components/layout/MobileMenuButton'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { formatMoney } from '@/lib/money'
 import { AlertCircle, CheckCircle2, Download, FileText, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { InvoiceForm } from './InvoiceForm'
@@ -36,10 +38,6 @@ const STATUS_LABEL: Record<Invoice['status'], { label: string; tone: 'muted' | '
   SENT: { label: 'Отправлен', tone: 'accent' },
   PAID: { label: 'Оплачен', tone: 'success' },
   CANCELLED: { label: 'Отменён', tone: 'danger' },
-}
-
-function formatMoney(n: number) {
-  return new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
 }
 
 export function InvoiceList() {
@@ -104,7 +102,10 @@ export function InvoiceList() {
   return (
     <div className="h-full flex flex-col">
       <header className="h-12 px-4 flex items-center justify-between border-b border-border shrink-0">
-        <h1 className="text-[13px] font-semibold text-text">Счета</h1>
+        <div className="flex items-center gap-1">
+          <MobileMenuButton />
+          <h1 className="text-[13px] font-semibold text-text">Счета</h1>
+        </div>
         <div className="flex items-center gap-2">
           {status && (
             <button
